@@ -19,26 +19,19 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	// "io"
 	"log"
 	"os"
-	// "regexp"
-	// "strconv"
 	"time"
 
-	// "cloud.google.com/go/civil"
-	// "cloud.google.com/go/spanner"
-	apioption "google.golang.org/api/option"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
-	// "google.golang.org/api/iterator"
-	// adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 	"github.com/GoogleCloudPlatform/golang-samples/spanner/backupfunction"
+	apioption "google.golang.org/api/option"
 )
 
 func main() {
 	databaseName := flag.String("databaseName", "", "projects/my-project/instances/my-instance/databases/example-db")
-	// Set expire to be the minimum expire duration of 6 hours
-	expire := flag.Duration("expire", 6*time.Hour, "The time.Duration after which the backup will expire")
+	// Set expire to be the 30 days
+	expire := flag.Duration("expire", 720*time.Hour, "The time.Duration after which the backup will expire")
 	backupPrefix := flag.String("backupPrefix", "backup", "Prefix for backup name, where backup name will be prefix+timestamp")
 	awaitCompletion := flag.Bool("awaitCompletion", false, "Boolean: await completion of backup")
 	flag.Usage = func() {
@@ -57,9 +50,7 @@ func main() {
 		os.Exit(2)
 	}
 	ctx := context.Background()
-	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	// defer cancel()
-	client, err := database.NewDatabaseAdminClient(ctx,apioption.WithEndpoint("staging-wrenchworks.sandbox.googleapis.com:443"))
+	client, err := database.NewDatabaseAdminClient(ctx, apioption.WithEndpoint("staging-wrenchworks.sandbox.googleapis.com:443"))
 	if err != nil {
 		log.Printf("database.NewDatabaseAdminClient: %v", err)
 		os.Exit(1)
@@ -70,6 +61,7 @@ func main() {
 		os.Exit(1)
 	}
 	if *awaitCompletion {
+		log.Println("Awaiting Backup completion")
 		backup, completionErr := op.Wait(ctx)
 		if completionErr != nil {
 			log.Printf("*database.CreateBackupOperation: %v", completionErr)
