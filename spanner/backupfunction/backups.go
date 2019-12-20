@@ -68,9 +68,7 @@ func Backupfunction(ctx context.Context, m PubSubMessage) error {
 	return nil
 }
 
-// [END spanner_functions_backup_util]
-
-// CreateBackup calls StartBackupOperation
+// CreateBackup calls StartBackupOperation on behalf of main (CLI) or Backupfunction which is executed by Cloud Function
 func CreateBackup(ctx context.Context, w io.Writer, adminClient *database.DatabaseAdminClient, databaseName string, expiry time.Duration, backupPrefix string) (lrop *database.CreateBackupOperation, err error) {
 	timeNow := time.Now()
 	backupID := backupPrefix + strings.Replace(timeNow.Format("20060102150405.000000000"), ".", "", -1)

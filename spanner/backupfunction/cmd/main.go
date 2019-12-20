@@ -30,7 +30,7 @@ import (
 
 func main() {
 	databaseName := flag.String("databaseName", "", "projects/my-project/instances/my-instance/databases/example-db")
-	// Set expire to be the 30 days
+	// Set expire to be 30 days
 	expire := flag.Duration("expire", 720*time.Hour, "The time.Duration after which the backup will expire")
 	backupPrefix := flag.String("backupPrefix", "backup", "Prefix for backup name, where backup name will be prefix+timestamp")
 	awaitCompletion := flag.Bool("awaitCompletion", false, "Boolean: await completion of backup")
