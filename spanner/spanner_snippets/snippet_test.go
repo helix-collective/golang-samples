@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"google.golang.org/api/iterator"
 	"os"
 	"strings"
 	"testing"
@@ -37,7 +38,15 @@ func TestSample(t *testing.T) {
 	if !strings.HasPrefix(instance, "projects/") {
 		t.Fatal("Spanner instance ref must be in the form of 'projects/PROJECT_ID/instances/INSTANCE_ID'")
 	}
-	dbName := fmt.Sprintf("%s/databases/test-%s", instance, tc.ProjectID)
+	databaseId := fmt.Sprintf("test-%s", tc.ProjectID)
+
+	// Maximum length of database name is 30 characters, so trim if the generated name is too long
+	if len(databaseId) > 30 {
+		trimmedDatabaseId := databaseId[:30]
+		t.Logf("Database name '%s' trimmed to '%s'", databaseId, trimmedDatabaseId)
+		databaseId = trimmedDatabaseId
+	}
+	dbName := fmt.Sprintf("%s/databases/%s", instance, databaseId)
 
 	ctx := context.Background()
 	adminClient, dataClient := createClients(ctx, dbName)
@@ -49,6 +58,23 @@ func TestSample(t *testing.T) {
 	if db, err := adminClient.GetDatabase(ctx, &adminpb.GetDatabaseRequest{Name: dbName}); err == nil {
 		t.Logf("database %s exists in state %s. delete result: %v", db.GetName(), db.GetState().String(),
 			adminClient.DropDatabase(ctx, &adminpb.DropDatabaseRequest{Database: dbName}))
+	}
+
+	// Check for any backups that were created from that database and delete those as well
+	backupsIterator := adminClient.ListBackups(ctx, &adminpb.ListBackupsRequest{
+		Parent: instance,
+		Filter: "Database:" + dbName,
+	})
+	for {
+		resp, err := backupsIterator.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			t.Errorf("Failed to list backups for database %s", dbName)
+		}
+		t.Logf("backup %s exists. delete result: %v", resp.Name,
+			adminClient.DeleteBackup(ctx, &adminpb.DeleteBackupRequest{Name: resp.Name}))
 	}
 
 	assertContains := func(t *testing.T, out string, sub string) {
@@ -242,4 +268,34 @@ func TestSample(t *testing.T) {
 	assertContains(t, out, "4 Venue 4")
 	assertContains(t, out, "19 Venue 19")
 	assertContains(t, out, "42 Venue 42")
+
+	out = runCommand(t, "createbackup", dbName)
+	assertContains(t, out, "Created backup [")
+	assertContains(t, out, "/backups/my-backup] from database")
+	out = runCommand(t, "cancelbackup", dbName)
+	assertContains(t, out, "Backup cancelled.")
+	out = runCommand(t, "listbackups", dbName)
+	assertContains(t, out, "/backups/my-backup [READY] - ")
+	assertContains(t, out, "Backup count: ")
+	out = runCommand(t, "listbackupsbyname", dbName)
+	assertContains(t, out, "/backups/my-backup [READY] - ")
+	assertContains(t, out, "Backup count: ")
+	out = runCommand(t, "listsmallbackups", dbName)
+	assertContains(t, out, "/backups/my-backup [READY] - ")
+	assertContains(t, out, "Backup count: ")
+	out = runCommand(t, "listnewbackups", dbName)
+	assertContains(t, out, "/backups/my-backup [READY] - ")
+	assertContains(t, out, "Backup count: ")
+	out = runCommand(t, "listinstancebackups", dbName)
+	assertContains(t, out, "/backups/")
+	out = runCommand(t, "listbackupoperations", dbName)
+	assertContains(t, out, "/operations/")
+	assertContains(t, out, "Backup operation count: ")
+	out = runCommand(t, "listdatabaseoperations", dbName)
+	assertContains(t, out, "/operations/")
+	assertContains(t, out, "Database operation count: ")
+	out = runCommand(t, "updatebackup", dbName)
+	assertContains(t, out, "Updated backup [my-backup]")
+	out = runCommand(t, "deletebackup", dbName)
+	assertContains(t, out, "Deleted backup [my-backup]")
 }
